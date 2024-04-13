@@ -136,7 +136,7 @@ pub struct ImageAtlas {
     pub size: Vec2
 }
 
-pub fn find_first_frame_in_tag<'a>(atlas: &'a ImageAtlas, name: &'a String) -> Option<&'a Frame> {
+pub fn find_first_frame_in_tag<'a, 'b>(atlas: &'a ImageAtlas, name: &'b String) -> Option<&'a Frame> {
     let maybe_tag = atlas.tags.get(name);
     if maybe_tag.is_none() { return None; }
 

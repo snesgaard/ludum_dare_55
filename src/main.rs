@@ -34,9 +34,11 @@ fn update(gs: &mut GameState, _c: &mut EngineContext) {
     
     let atlas = gs.atlas.as_ref().unwrap();
 
+    let frame = find_first_frame_in_tag(atlas, &"background/background".to_string()).unwrap();
+
     draw_frame(
         atlas,
-        find_first_frame_in_tag(atlas, &"background/background".to_string()).unwrap(),
+        frame,
         vec2(0.0, 0.0)
     );
 }
