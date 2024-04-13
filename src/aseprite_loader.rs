@@ -1,99 +1,199 @@
 use std::path::Path;
-use serde_json::{Result, Value};
 use std::fs::File;
 use std::io::BufReader;
-use comfy::*;
 use std::collections::HashMap;
+use comfy::{Color, WHITE, Itertools, load_texture_from_engine_bytes, epaint::TextureId, egui::Image};
+use serde::{Deserialize, Serialize};
+use serde_json::{Result, Value};
+use comfy::*;
 
 use crate::main;
 
-struct Rectangle {
-    x: f64,
-    y: f64,
-    w: f64,
-    h: f64
+#[derive(Serialize, Deserialize, Clone, Copy)]
+pub struct Rect {
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32
 }
 
-fn rectangle(x: f64, y: f64, w: f64, h: f64) -> Rectangle {
-    return Rectangle{x: x, y: y, w: w, h: h};
+#[derive(Serialize, Deserialize)]
+pub struct AsepriteSize {
+    w: i32,
+    h: i32
 }
 
-struct AsepriteFrame {
-    rect: IRect,
-    duration: i64
+#[derive(Serialize, Deserialize)]
+pub struct SliceKeys {
+    frame: i32,
+    bounds: Rect
 }
 
-struct FrameTag {
-    from: i64,
-    to: i64
+#[derive(Serialize, Deserialize)]
+pub struct AsepriteFrame {
+    filename: String,
+    frame: Rect,
+    rotated: bool,
+    trimmed: bool,
+    spriteSourceSize: Rect,
+    duration: i32
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct AsepriteFrametag {
+    name: String,
+    to: i32,
+    from: i32,
+    direction: String
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct AspriteSliceInstance {
+    frame: i32,
+    bounds: Rect
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct AsepriteSlice {
+    name: String,
+    color: String,
+    data: Option<String>,
+    keys: Vec<AspriteSliceInstance>,
+    from: i32,
+    to: i32
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct AsepriteMeta {
+    app: String,
+    version: String,
+    image: String,
+    format: String,
+    size: AsepriteSize,
+    scale: String,
+    frameTags: Vec<AsepriteFrametag>,
+    slices: Vec<AsepriteSlice>
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct AsepriteAtlas {
-    id: String,
     frames: Vec<AsepriteFrame>,
-    frame_tags: HashMap<String, FrameTag>
+    meta: AsepriteMeta
 }
 
-pub fn draw_atlas_frame(atlas: &AsepriteAtlas, frame_index: i64, x: f32, y: f32) {
-    let camera = main_camera();
-    let f = &atlas.frames[frame_index as usize];
-    let params = DrawTextureProParams{
-        source_rect: Some(f.rect),
-        size: Vec2::new((f.rect.size.x as f32) / camera.zoom, (f.rect.size.y as f32)  / camera.zoom),
+pub struct Slice {
+    bound: Rect,
+    data: Value,
+    color: Color,
+    name: String
+}
+
+pub struct Frame {
+    rect: Rect,
+    slices: Vec<Slice>,
+    duration: i32
+}
+
+fn is_frame_covered(frame_index: i32, ase: &AspriteSliceInstance) -> bool {
+    return ase.frame <= frame_index;
+}
+
+fn find_single_slice_in_frames(frame_index: i32, slice: &AsepriteSlice) -> Option<Slice> {
+    if frame_index < slice.from || slice.to < frame_index {
+        return None;
+    }
+
+    let s = slice.keys.iter().rev().find_or_last (|&x| is_frame_covered(frame_index, x));
+
+    if s.is_none() {
+        return None;
+    }
+
+    return Some(Slice {
+        bound: s.unwrap().bounds,
+        data: match &slice.data {
+            Some(s) => serde_json::from_str(s.as_str()).unwrap(),
+            None => serde_json::from_str("{}").unwrap()
+        }, 
+        color: WHITE,
+        name: slice.name.clone()
+    })
+}
+
+fn find_slices_in_frame(frame_index: i32, slices: &Vec<AsepriteSlice>) -> Vec<Slice> {
+    return slices
+        .iter()
+        .map(|s| find_single_slice_in_frames(frame_index, &s))
+        .filter(|s| s.is_some())
+        .map(|s| s.unwrap())
+        .collect_vec();
+}
+
+pub struct ImageAtlas {
+    pub texture_id: TextureHandle,
+    pub frames: Vec<Frame>,
+    pub tags: HashMap<String, AsepriteFrametag>,
+    pub size: Vec2
+}
+
+pub fn find_first_frame_in_tag<'a>(atlas: &'a ImageAtlas, name: &'a String) -> Option<&'a Frame> {
+    let maybe_tag = atlas.tags.get(name);
+    if maybe_tag.is_none() { return None; }
+
+    return atlas.frames.get(maybe_tag.unwrap().from as usize);
+}
+
+pub fn draw_frame(atlas: &ImageAtlas, frame: &Frame, pos: Vec2) {
+    let params = DrawTextureProParams {
+        source_rect: Some(IRect{
+            offset: IVec2::new(frame.rect.x, frame.rect.y),
+            size: ivec2(frame.rect.w, frame.rect.h)
+        }),
+        size: vec2(frame.rect.w as f32, frame.rect.h as f32),
         ..Default::default()
     };
-
-    draw_sprite_pro(texture_id("atlas"), Vec2::new(x, y), WHITE, 0, params);
+    draw_sprite_pro(atlas.texture_id, pos, WHITE, 0, params)
 }
 
-pub fn load_aseprite_atlas(c: &mut EngineContext, json_path: &Path, atlas: &Path) -> AsepriteAtlas {
-    // Open the file in read-only mode with buffer.
+pub fn load_aseprite_atlas( _c: &mut EngineContext, json_path: &Path) -> ImageAtlas {
     let file = File::open(json_path).unwrap();
-    let reader = BufReader::new(file);
- 
-    // Read the JSON contents of the file as an instance of `User`.
-    let root: Value = serde_json::from_reader(reader).unwrap();
+    let root: AsepriteAtlas = serde_json::from_reader(file).unwrap();
 
-    let mut frames: Vec<AsepriteFrame> = vec![];
+    println!("Loading {}", json_path.to_str().unwrap());
+    for s in find_slices_in_frame(11, &root.meta.slices) {
+        println!(
+            "Slice [{}, {}, {}, {}] = {}",
+            s.bound.x, s.bound.y, s.bound.w, s.bound.h,
+            s.data
+        );
+    }
 
-    for frame in root["frames"].as_array().unwrap() {
-        let quad_json = frame["frame"].as_object().unwrap();
-        let quad = IRect{
-            offset: ivec2(
-                quad_json["x"].as_i64().unwrap() as i32,
-                quad_json["y"].as_i64().unwrap() as i32
-            ),
-            size: ivec2(
-                quad_json["w"].as_i64().unwrap() as i32,
-                quad_json["h"].as_i64().unwrap() as i32
-            )
+    let mut formatter_frames: Vec<Frame> = vec![];
+    for (frame_index, frame) in root.frames.iter().enumerate() {
+        let slices = find_slices_in_frame(frame_index as i32, &root.meta.slices);
+        let out_frame = Frame {
+            duration: frame.duration,
+            rect: frame.frame,
+            slices: slices
         };
-    
-        let f = AsepriteFrame{rect: quad, duration: frame["duration"].as_i64().unwrap()};
-        frames.push(f);
+        formatter_frames.push(out_frame);
     }
 
-    c.load_texture_from_bytes(
-        // Every texture gets a string name later used to reference it.
-        "atlas",
-        include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/target/atlas.png")),
-    );
+    let image_path = json_path.parent().unwrap().join(root.meta.image);
+    println!("Loading image file {}", image_path.to_str().unwrap());
+    let file = File::open(json_path).unwrap();
+    _c.load_texture_from_bytes("atlas", std::fs::read(image_path).unwrap().as_slice());
 
-    let mut frame_tags: HashMap<String, FrameTag> = HashMap::new();
+    let mut tags: HashMap<String, AsepriteFrametag> = hashmap! {};
 
-    for frame_tag in root["meta"]["frameTags"].as_array().unwrap() {
-        let name = frame_tag["name"].as_str().unwrap().to_string();
-        let from = frame_tag["from"].as_i64().unwrap();
-        let to = frame_tag["to"].as_i64().unwrap();
 
-        let ft = FrameTag {from: from, to: to};
-        frame_tags.insert(name, ft);
+    for ft in root.meta.frameTags.iter() {
+        tags.insert(ft.name.clone(), ft.clone());
     }
 
-    let atlas = AsepriteAtlas{
-        id: "atlas".to_string(),
-        frames: frames,
-        frame_tags: frame_tags
+    return ImageAtlas {
+        texture_id: texture_id("atlas"), frames: formatter_frames,
+        tags: tags,
+        size: vec2(root.meta.size.w as f32, root.meta.size.h as f32)
     };
-    return atlas
 }

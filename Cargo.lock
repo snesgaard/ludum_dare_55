@@ -525,6 +525,7 @@ version = "0.1.0"
 dependencies = [
  "asefile",
  "comfy",
+ "serde",
  "serde_json",
 ]
 
