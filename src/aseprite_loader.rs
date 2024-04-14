@@ -11,16 +11,16 @@ use crate::main;
 
 #[derive(Serialize, Deserialize, Clone, Copy)]
 pub struct Rect {
-    x: i32,
-    y: i32,
-    w: i32,
-    h: i32
+    pub x: i32,
+    pub y: i32,
+    pub w: i32,
+    pub h: i32
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct AsepriteSize {
-    w: i32,
-    h: i32
+    pub w: i32,
+    pub h: i32
 }
 
 #[derive(Serialize, Deserialize)]
@@ -36,6 +36,7 @@ pub struct AsepriteFrame {
     rotated: bool,
     trimmed: bool,
     spriteSourceSize: Rect,
+    sourceSize: AsepriteSize,
     duration: i32
 }
 
@@ -82,16 +83,18 @@ pub struct AsepriteAtlas {
 }
 
 pub struct Slice {
-    bound: Rect,
-    data: Value,
-    color: Color,
-    name: String
+    pub bound: Rect,
+    pub data: Value,
+    pub color: Color,
+    pub name: String
 }
 
 pub struct Frame {
-    rect: Rect,
-    slices: Vec<Slice>,
-    duration: i32
+    pub rect: Rect,
+    pub slices: Vec<Slice>,
+    pub duration: i32,
+    pub source_size: AsepriteSize,
+    pub sprite_source_size: Rect
 }
 
 fn is_frame_covered(frame_index: i32, ase: &AspriteSliceInstance) -> bool {
@@ -109,6 +112,9 @@ fn find_single_slice_in_frames(frame_index: i32, slice: &AsepriteSlice) -> Optio
         return None;
     }
 
+    if slice.data.is_some() {
+        println!("Processing slice data {}", slice.data.as_ref().unwrap());
+    }
     return Some(Slice {
         bound: s.unwrap().bounds,
         data: match &slice.data {
@@ -143,7 +149,7 @@ pub fn find_first_frame_in_tag<'a, 'b>(atlas: &'a ImageAtlas, name: &'b String) 
     return atlas.frames.get(maybe_tag.unwrap().from as usize);
 }
 
-pub fn draw_frame(atlas: &ImageAtlas, frame: &Frame, pos: Vec2) {
+pub fn draw_frame(atlas: &ImageAtlas, frame: &Frame, pos: Vec2, z_index: i32) {
     let params = DrawTextureProParams {
         source_rect: Some(IRect{
             offset: IVec2::new(frame.rect.x, frame.rect.y),
@@ -152,7 +158,20 @@ pub fn draw_frame(atlas: &ImageAtlas, frame: &Frame, pos: Vec2) {
         size: vec2(frame.rect.w as f32, frame.rect.h as f32),
         ..Default::default()
     };
-    draw_sprite_pro(atlas.texture_id, pos, WHITE, 0, params)
+
+    let sprite_pos = vec2(
+        frame.sprite_source_size.x as f32,
+        -frame.sprite_source_size.y as f32,
+    );
+    let offset = vec2(
+        -( -frame.sprite_source_size.w + frame.source_size.w) as f32 * 0.5,
+        -( frame.sprite_source_size.h - frame.source_size.h) as f32 * 0.5
+    );
+    draw_sprite_pro(
+        atlas.texture_id,
+        pos + offset + sprite_pos,
+        WHITE, z_index, params
+    );
 }
 
 pub fn load_aseprite_atlas( _c: &mut EngineContext, json_path: &Path) -> ImageAtlas {
@@ -174,7 +193,9 @@ pub fn load_aseprite_atlas( _c: &mut EngineContext, json_path: &Path) -> ImageAt
         let out_frame = Frame {
             duration: frame.duration,
             rect: frame.frame,
-            slices: slices
+            slices: slices,
+            source_size: frame.sourceSize.clone(),
+            sprite_source_size: frame.spriteSourceSize.clone()
         };
         formatter_frames.push(out_frame);
     }
@@ -192,7 +213,8 @@ pub fn load_aseprite_atlas( _c: &mut EngineContext, json_path: &Path) -> ImageAt
     }
 
     return ImageAtlas {
-        texture_id: texture_id("atlas"), frames: formatter_frames,
+        texture_id: texture_id("atlas"),
+        frames: formatter_frames,
         tags: tags,
         size: vec2(root.meta.size.w as f32, root.meta.size.h as f32)
     };
