@@ -28,7 +28,7 @@ pub struct Level {
     pub frame: String
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum Pickup {
     Skull {},
     Fire {},
@@ -66,3 +66,7 @@ pub struct Motion {
 pub enum Demon {
     ToothImp {}
 }
+
+pub struct DrawNo {}
+
+pub struct DrawWin {}

@@ -227,6 +227,21 @@ fn draw_demons(gs: &GameState) {
     }
 }
 
+fn should_draw_no() -> bool {
+    for (id, no) in world().query::<&component::DrawNo>().iter() {
+        return true;
+    }
+
+    return false;
+}
+
+fn should_draw_win() -> bool {
+    for (id, win) in world().query::<&component::DrawWin>().iter() {
+        return true;
+    }
+    return false;
+}
+
 fn update(gs: &mut GameState, _c: &mut EngineContext) {
     if is_key_pressed(KeyCode::Escape) {
         *_c.quit_flag = true;
@@ -238,7 +253,7 @@ fn update(gs: &mut GameState, _c: &mut EngineContext) {
     draw_frame(atlas, frame, vec2(0.0, 0.0), 0);
 
     let ui_frame = find_first_frame_in_tag(atlas, &"GUI/ui".to_string()).unwrap();
-    draw_frame(atlas, ui_frame, vec2(0.0, 0.0), 1);
+    //draw_frame(atlas, ui_frame, vec2(0.0, 0.0), 1);
 
     // Update 
     system::clickable_spin();
@@ -264,6 +279,16 @@ fn update(gs: &mut GameState, _c: &mut EngineContext) {
     //draw_recipe_stack_from_stack(gs, &recipe_stack);
     draw_recipe_stack(gs);
     draw_demons(gs);
+
+    if should_draw_no() {
+        let no_frames = find_first_frame_in_tag(atlas, &"no/no".to_string()).unwrap();
+        draw_frame(atlas, no_frames, vec2(0.0, 0.0), 100);
+    }
+
+    if should_draw_win() {
+        let win_frames = find_first_frame_in_tag(atlas, &"no/win".to_string()).unwrap();
+        draw_frame(atlas, win_frames, vec2(0.0, 0.0), 100);
+    }
 }
 
 

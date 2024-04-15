@@ -1,7 +1,7 @@
 use std::ops::Add;
 
 use comfy::*;
-use crate::component::{self, IsHovered, Pickup, WasClicked, Lifetime, Demon, Motion};
+use crate::component::{self, IsHovered, Pickup, WasClicked, Lifetime, Demon, Motion, DrawNo, DrawWin};
 use crate::aseprite_loader::{ImageAtlas};
 
 pub fn get_world_click_box(model_box: &component::ClickBox, pos: &Vec2) -> component::ClickBox {
@@ -213,45 +213,68 @@ pub fn get_recipe_stack() -> Vec<component::Pickup> {
 }
 
 pub fn recipe_stack_spin() {
-    if 3 <= get_recipe_stack().len() {
+    let correct_answers: Vec<component::Pickup> = [
+        component::Pickup::Knife {  },
+        component::Pickup::Eye {  },
+        component::Pickup::Fire {  }
+    ].to_vec();
+     
+    let current_stack = get_recipe_stack();
+
+    if 3 <= current_stack.len() {
         for (_, gs) in world_mut().query_mut::<&mut component::GlobalGameState>().into_iter() {
             gs.recipe_stack.clear();
         }
 
-        commands().spawn((
-            ParticleSystem::with_spawn_on_death(300, || {
-                Particle {
-                    texture: texture_id("atlas"),
-                    position: random_circle(5.0),
-                    size: splat(10.0),
-                    size_curve: expo_out,
-                    z_index: 30,
-                    angular_velocity: random() * 10.0,
-                    // Both size and color can be faded.
-                    fade_type: FadeType::Both,
-                    color_start: RED,
-                    color_end: RED,
-                    ..Default::default()
-                }
-            }),
-            Transform::position(vec2(10.0, 0.0)),
-            Lifetime {time: 0.0, duration: 2.0}
-        ));
+        if current_stack == correct_answers {
+            commands().spawn((
+                ParticleSystem::with_spawn_on_death(300, || {
+                    Particle {
+                        texture: texture_id("atlas"),
+                        position: random_circle(5.0),
+                        size: splat(10.0),
+                        size_curve: expo_out,
+                        z_index: 30,
+                        angular_velocity: random() * 10.0,
+                        // Both size and color can be faded.
+                        fade_type: FadeType::Both,
+                        color_start: RED,
+                        color_end: RED,
+                        ..Default::default()
+                    }
+                }),
+                Transform::position(vec2(10.0, 0.0)),
+                Lifetime {time: 0.0, duration: 2.0}
+            ));
 
-        let rx = random() * 2.0 - 1.0;
-        let ry = random();
+            let rx = random() * 2.0 - 1.0;
+            let ry = random();
 
-        commands().spawn(
-            (
-                Demon::ToothImp {},
-                Lifetime {time: 0.0, duration: 2.0},
-                Motion {
-                    position: vec2(10.0, 0.0),
-                    velocity: vec2(rx * 200.0, ry * 200.0),
-                    gravity: vec2(0.0, -300.0)
-                },
-            )
-        )
+            commands().spawn(
+                (
+                    Demon::ToothImp {},
+                    Lifetime {time: 0.0, duration: 2.0},
+                    Motion {
+                        position: vec2(10.0, 0.0),
+                        velocity: vec2(rx * 200.0, ry * 200.0),
+                        gravity: vec2(0.0, -300.0)
+                    },
+                )
+            );
+            commands().spawn(
+                (
+                    DrawWin {},
+                    Lifetime {time: 0.0, duration: 2.0}
+                )
+            );
+        } else {
+            commands().spawn(
+                (
+                    DrawNo {},
+                    Lifetime {time: 0.0, duration: 2.0}
+                )
+            );
+        }
     }
 }
 
@@ -261,6 +284,14 @@ pub fn Lifetime_spin() {
 
         if lifetime.duration <= lifetime.time {
             commands().despawn(id);
+        }
+    }
+
+    for (id, lifetime) in world().query::<&component::Lifetime>().iter() {
+        if lifetime.duration <= lifetime.time {
+            if world().get::<&component::DrawWin>(id).is_ok() {
+                panic!();
+            }
         }
     }
 }
