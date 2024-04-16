@@ -157,6 +157,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "asmodeus_web_summons"
+version = "0.1.0"
+dependencies = [
+ "asefile",
+ "comfy",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "atomic-arena"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -517,16 +527,6 @@ checksum = "40f406ef048802d72571865158891658c0d5604cca16be77ec481e93d78c5378"
 dependencies = [
  "proc-macro2",
  "quote",
-]
-
-[[package]]
-name = "comy_rust"
-version = "0.1.0"
-dependencies = [
- "asefile",
- "comfy",
- "serde",
- "serde_json",
 ]
 
 [[package]]

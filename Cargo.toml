@@ -1,5 +1,5 @@
  [package]
-name = "comy_rust"
+name = "asmodeus_web_summons"
 version = "0.1.0"
 edition = "2021"
 
@@ -12,7 +12,7 @@ serde = { version = "1.0", features = ["derive"] }
 
 
 [[bin]]
-name = "comfy_rust"
+name = "asmodeus_web_summons"
 path = "src/main.rs"
 
 # Enable a small amount of optimization in debug mode
