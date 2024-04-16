@@ -6,6 +6,7 @@ use comfy::{Color, WHITE, Itertools, load_texture_from_engine_bytes, epaint::Tex
 use serde::{Deserialize, Serialize};
 use serde_json::{Result, Value};
 use comfy::*;
+use std::str;
 
 use crate::main;
 
@@ -204,6 +205,55 @@ pub fn load_aseprite_atlas( _c: &mut EngineContext, json_path: &Path) -> ImageAt
     println!("Loading image file {}", image_path.to_str().unwrap());
     let file = File::open(json_path).unwrap();
     _c.load_texture_from_bytes("atlas", std::fs::read(image_path).unwrap().as_slice());
+
+    let mut tags: HashMap<String, AsepriteFrametag> = hashmap! {};
+
+
+    for ft in root.meta.frameTags.iter() {
+        tags.insert(ft.name.clone(), ft.clone());
+    }
+
+    return ImageAtlas {
+        texture_id: texture_id("atlas"),
+        frames: formatter_frames,
+        tags: tags,
+        size: vec2(root.meta.size.w as f32, root.meta.size.h as f32)
+    };
+}
+
+pub fn load_aseprite_atlas_bytes(
+        _c: &mut EngineContext,
+        json_bytes: &[u8],
+        png_bytes: &[u8]
+) -> ImageAtlas {
+    //let file = File::open(json_path).unwrap();
+    //let root: AsepriteAtlas = serde_json::from_reader(file).unwrap();
+    let root: AsepriteAtlas = serde_json::from_slice(json_bytes).unwrap();
+
+    for s in find_slices_in_frame(11, &root.meta.slices) {
+        println!(
+            "Slice [{}, {}, {}, {}] = {}",
+            s.bound.x, s.bound.y, s.bound.w, s.bound.h,
+            s.data
+        );
+    }
+
+    let mut formatter_frames: Vec<Frame> = vec![];
+    for (frame_index, frame) in root.frames.iter().enumerate() {
+        let slices = find_slices_in_frame(frame_index as i32, &root.meta.slices);
+        let out_frame = Frame {
+            duration: frame.duration,
+            rect: frame.frame,
+            slices: slices,
+            source_size: frame.sourceSize.clone(),
+            sprite_source_size: frame.spriteSourceSize.clone()
+        };
+        formatter_frames.push(out_frame);
+    }
+
+    _c.load_texture_from_bytes(
+        "atlas", png_bytes
+    );
 
     let mut tags: HashMap<String, AsepriteFrametag> = hashmap! {};
 

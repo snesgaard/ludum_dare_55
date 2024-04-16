@@ -1,4 +1,4 @@
-use aseprite_loader::{load_aseprite_atlas, ImageAtlas, draw_frame, find_first_frame_in_tag};
+use aseprite_loader::{load_aseprite_atlas_bytes, ImageAtlas, draw_frame, find_first_frame_in_tag};
 use component::{IsBook, Demon};
 use system::world_clickbox_from_id;
 use std::path::Path;
@@ -30,7 +30,16 @@ fn setup(gs: &mut GameState, _c: &mut EngineContext) {
     let mut m = main_camera_mut();
     m.zoom = screen_width() / 4.0;
 
-    let atlas = load_aseprite_atlas(_c, Path::new("target/atlas.json"));
+    let json_bytes = include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/target/atlas.json"
+    ));
+    let png_bytes = include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/target/atlas.png"
+    ));
+
+    let atlas = load_aseprite_atlas_bytes(_c, json_bytes, png_bytes);
 
     let frame = find_first_frame_in_tag(&atlas, &"background/background".to_string()).unwrap();
     spawn_level(frame);
